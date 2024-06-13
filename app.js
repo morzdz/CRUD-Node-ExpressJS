@@ -7,9 +7,9 @@ const app = express();
 app.use(bodyParser.json());
 
 let users = [
-    { id: 1, name: 'Alice', email: 'alice@example.com' },
-    { id: 2, name: 'Bob', email: 'bob@example.com' },
-    { id: 3, name: 'Charlie', email: 'charlie@example.com' }
+    { id: 1, name: 'Alice', email: 'alice@example.com', password: 'motdepasseAlice' },
+    { id: 2, name: 'Bob', email: 'bob@example.com', password: 'motdepasseBob' },
+    { id: 3, name: 'Charlie', email: 'charlie@example.com', password: 'motdepasseCharlie' }
 ];
 
 app.get("", (req, res) => {
@@ -35,7 +35,8 @@ app.post("/users", (req, res) => {
     const newUser = {
         id: users.length + 1,
         name: req.body.name,
-        email: req.body.email
+        email: req.body.email,
+        password: req.body.password
     };
     users.push(newUser);
     res.status(201).send(newUser);
