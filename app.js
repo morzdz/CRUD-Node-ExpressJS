@@ -1,5 +1,6 @@
 const express = require("express");
 const bodyParser = require("body-parser");
+const argon2 = require("argon2");
 const port = 3000;
 
 const app = express();
@@ -31,16 +32,34 @@ app.get("/users/:id", (req, res) => {
     }
 })
 
-app.post("/users", (req, res) => {
-    const newUser = {
-        id: users.length + 1,
-        name: req.body.name,
-        email: req.body.email,
-        password: req.body.password
-    };
-    users.push(newUser);
-    res.status(201).send(newUser);
+app.post("/users", async (req, res) => {
+    try {
+        const hashPassword = await argon2.hash(req.body.password);
+
+        const newUser = {
+            id: users.length + 1,
+            name: req.body.name,
+            email: req.body.email,
+            password: hashPassword
+        };
+
+        users.push(newUser);
+        res.status(201).send(newUser);
+    } catch (err) {
+        console.error('Erreur lors du hachage du mot de passe:', err);
+        res.status(500).send({message : `Erreur lors de la création de l'utilisateur`})
+    }
 })
+
+// const verifyPassword = (req, res) => {
+
+//     try {
+
+//     } catch (err) {
+//         console.log(err);
+//         return res.status(500)
+//     }
+// }
 
 app.put("/users/:id", (req, res) => {
     const userId = parseInt(req.params.id, 10);
