@@ -1,7 +1,10 @@
 const express = require("express");
 const bodyParser = require("body-parser");
 const argon2 = require("argon2");
+const jwt = require("jsonwebtoken");
 const port = 3000;
+
+const JWT_SECRET = "your_secret_key"; // Définir la clé secrète JWT directement
 
 const app = express(); // Initialise une instance d'Express
 
@@ -14,7 +17,7 @@ let users = [ // Tableau d'exemple d'utilisateurs
 ];
 
 // Endpoint GET pour la racine de l'API
-app.get("", (req, res) => {
+app.get("/", (req, res) => {
     res.status(200).send("hello world"); // Répond avec "hello world" et un statut 200
 });
 
@@ -66,8 +69,13 @@ app.post("/login", async (req, res) => {
             res.status(404).send({ message: `Utilisateur non trouvé` }); // Renvoie un message si l'utilisateur n'est pas trouvé
         }
 
-        if (await argon2.verify(user.password, password)) {
-            res.send({ message: 'Connexion réussie' }); // Renvoie un message de connexion réussie si le mot de passe correspond
+        const isVerified = await argon2.verify(user.password, password);
+
+        if (isVerified) {
+            const payload = {sub: user.id};
+            const token = jwt.sign(payload, JWT_SECRET)
+            console.log(token, 'token');
+            res.status(201).send({ token, userId: user.id}); // Retourne le token et l'ID utilisateur
         } else {
             res.status(401).send('Mot de passe incorrect'); // Renvoie un statut 401 si le mot de passe est incorrect
         }
@@ -78,8 +86,42 @@ app.post("/login", async (req, res) => {
     }
 });
 
+// Middleware pour vérifier le token
+const verifyToken = (req, res, next) => {
+    try {
+        // Récupère l'en-tête d'autorisation de la requête
+        const authorizationHeader = req.get("Authorization");
+
+        // Vérifie si l'en-tête d'autorisation est présent
+        if (authorizationHeader == null) {
+            // Si l'en-tête est manquant, lance une erreur
+            throw new Error("L'en-tête d'autorisation est manquant");
+        }
+
+        // Sépare le type de token et le token lui-même
+        const [type, token] = authorizationHeader.split(" ");
+
+        // Vérifie si le type est bien "Bearer"
+        if (type !== "Bearer") {
+            // Si le type n'est pas "Bearer", lance une erreur
+            throw new Error("L'en-tête d'autorisation n'a pas le type 'Bearer'");
+        }
+
+        // Vérifie et décode le token en utilisant la clé secrète JWT
+        req.payload = jwt.verify(token, JWT_SECRET);
+
+        // Passe au middleware ou à la route suivante si tout est correct
+        next();
+    } catch (err) {
+        // Si une erreur se produit, affiche l'erreur dans la console
+        console.error(err);
+        // Renvoie une réponse avec le statut 401 (Non autorisé)
+        res.sendStatus(401);
+    }
+};
+
 // Endpoint PUT pour mettre à jour un utilisateur existant par son ID
-app.put("/users/:id", (req, res) => {
+app.put("/users/:id", verifyToken, (req, res) => {
     const userId = parseInt(req.params.id, 10); // Récupère l'ID de l'utilisateur depuis les paramètres de l'URL
     const userIndex = users.findIndex((u) => u.id === userId); // Trouve l'index de l'utilisateur dans le tableau
 
@@ -92,7 +134,7 @@ app.put("/users/:id", (req, res) => {
 });
 
 // Endpoint PATCH pour mettre à jour partiellement un utilisateur existant par son ID
-app.patch("/users/:id", (req, res) => {
+app.patch("/users/:id",verifyToken, (req, res) => {
     const userId = parseInt(req.params.id, 10); // Récupère l'ID de l'utilisateur depuis les paramètres de l'URL
     const userIndex = users.findIndex((u) => u.id === userId); // Trouve l'index de l'utilisateur dans le tableau
 
@@ -105,7 +147,7 @@ app.patch("/users/:id", (req, res) => {
 });
 
 // Endpoint DELETE pour supprimer un utilisateur par son ID
-app.delete("/users/:id", (req, res) => {
+app.delete("/users/:id", verifyToken, (req, res) => {
     const userId = parseInt(req.params.id, 10); // Récupère l'ID de l'utilisateur depuis les paramètres de l'URL
     const userIndex = users.findIndex((u) => u.id === userId); // Trouve l'index de l'utilisateur dans le tableau
 
